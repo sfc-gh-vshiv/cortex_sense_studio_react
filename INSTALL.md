@@ -47,7 +47,7 @@ and grants roles. Ask: "Run this as ACCOUNTADMIN?" Run it only after a yes.
 snow sql -c "$CONN" -f setup.sql
 ```
 
-Check: `SHOW COMPUTE POOLS LIKE '<POOL>'` returns one row.
+Check: `SHOW ROLES LIKE '<OWNER_ROLE>'` and `SHOW COMPUTE POOLS LIKE '<POOL>'` each return one row.
 
 ## 4. Let the app see a context
 
