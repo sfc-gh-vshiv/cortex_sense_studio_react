@@ -1,0 +1,11 @@
+# Warehouse runtime dependencies (Snowflake Anaconda Channel). This app needs the
+# container runtime (the Sense functions fail in owner's-rights procedures); the file
+# stays so the dependency tests can check both runtimes pin the same Streamlit.
+name: sf_env
+channels:
+  - snowflake
+dependencies:
+  - python=3.11.*
+  - streamlit=1.52.2
+  - snowflake-snowpark-python
+  - pyyaml
