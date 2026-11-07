@@ -91,7 +91,7 @@ export const CSS = `
 .sl .md ul{margin:4px 0;padding-left:18px}.sl .md code{background:var(--fill);border-radius:4px;padding:0 4px;font-size:12px}
 .sl .md pre{background:var(--head);border:1px solid var(--line);border-radius:10px;padding:8px 10px;overflow:auto;font-size:12px}
 .sl .scroll{max-height:560px;overflow:auto}
-.sl .mm{position:relative;border:1px solid var(--line);border-radius:14px;background:#fff;overflow:auto;max-height:640px;min-height:120px}
+.sl .mm{position:relative;border:1px solid var(--line);border-radius:14px;background:#fff;overflow:auto;max-height:780px;min-height:120px}
 .sl .mm .tools{position:sticky;top:6px;left:6px;z-index:2;display:inline-flex;gap:4px;margin:6px}
 .sl .mm .canvas{padding:8px 12px}
 .sl .mm svg{max-width:none!important;height:auto}

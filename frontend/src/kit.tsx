@@ -36,10 +36,12 @@ const Q: Queue = W.__slQ || (W.__slQ = {});
 Q.inflight ??= null; Q.queue ??= []; Q.last ??= {}; Q.size ??= {}; Q.ack ??= [];
 Q.polls ??= {}; Q.backoff ??= {}; Q.reported ??= "";
 
-// Tests shorten the timings with window.__slTiming = { retryMs, maxTries }.
+// Tests shorten the timings with window.__slTiming = { retryMs, idleRetryMs, maxTries }.
 const T = W.__slTiming || {};
-// SiS reruns are slower than local ones; a short retry would interrupt a run that is still working.
-const RETRY_MS = T.retryMs || 15000, MAX_TRIES = T.maxTries || 5, KEEP = 400, ACK_COUNT = 4, ACK_BYTES = 256 * 1024;
+// A re-send interrupts the run that is handling the request, and a long run (Snowflake
+// result downloads in SiS) can take many seconds. So a request is re-sent only when
+// Streamlit is idle without having answered it, or when nothing has come back for 2 min.
+const RETRY_MS = T.retryMs || 120000, IDLE_RETRY_MS = T.idleRetryMs || 2500, MAX_TRIES = T.maxTries || 5, KEEP = 400, ACK_COUNT = 4, ACK_BYTES = 256 * 1024;
 
 export function send(action: string, payload: Any = {}): string {
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -68,7 +70,11 @@ function watchdog() {
     if (Q.ack.length >= ACK_COUNT || bytes >= ACK_BYTES) send("ack");
     return;
   }
-  if (f.id in Q.last || Date.now() - f.t < RETRY_MS) return;
+  // Re-send when the write was evidently lost (Streamlit idle, still no answer), or after
+  // RETRY_MS. A run in progress is left alone: a re-send would restart it from the top.
+  const age = Date.now() - f.t;
+  const lostWrite = !scriptRunning() && age > IDLE_RETRY_MS;
+  if (f.id in Q.last || (!lostWrite && age < RETRY_MS)) return;
   if (f.tries >= MAX_TRIES) {           // give up: surface an error and unblock the queue
     Q.last[f.id] = { ok: false, result: null, error: "No response from the app. Please try again." };
     Q.inflight = null;

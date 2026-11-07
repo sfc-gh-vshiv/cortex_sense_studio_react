@@ -17,6 +17,7 @@ const BANNED = [
   [/insertAdjacentHTML/, "insertAdjacentHTML"],
   [/document\.write/, "document.write"],
   [/\beval\s*\(|new\s+Function\s*\(/, "eval / new Function"],
+  [/<form[\s>]/, "<form> (Snowsight runs the app in a sandboxed frame that drops form submits; use a button and an Enter handler)"],
   [/\bfetch\s*\(|XMLHttpRequest|WebSocket\s*\(|import\s*\(\s*["'`]https?:/, "network call (keep the bundle self-contained; Snowflake is reached through Python)"],
 ];
 

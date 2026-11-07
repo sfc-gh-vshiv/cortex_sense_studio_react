@@ -32,6 +32,8 @@ const lagLabel = (lag?: string) => { const h = /^(\d+)h/.exec(lag || ""); if (!h
 
 type Ctx = { key: string; id: number; db: string; schema: string; name: string; description: string; last_processed_at?: string; target_lag?: string };
 
+/** Enter in an input runs `f`. Used instead of a form element, whose submit Snowsight's sandbox drops. */
+const onEnter = (f: () => unknown) => (e: React.KeyboardEvent) => { if (e.key === "Enter") { e.preventDefault(); f(); } };
 const fmtWhen = (s?: string) => (s ? s.replace("T", " ").replace(/\.\d+/, "").replace("Z", " UTC") : "never");
 const short = (fqn: string) => fqn.split(".").pop() || fqn;
 /** SCHEMA.OBJECT: short enough to read in a diagram, still unambiguous in most scopes. */
@@ -169,30 +171,32 @@ function Coverage({ ctx }: { ctx: Ctx }) {
         <Tile label="Not profiled" value={objects.length - ok} dot="#b91c1c" sub={objects.length - ok ? "in scope, not indexed" : "none"} />
         <Tile label="Coverage" value={pct(ok, objects.length) + "%"} sub={`${bySchema.length} schemas`} />
       </div>
-      <div className="band grid32">
+      <div className="band">
         <Panel title="Coverage map" cap="Click a schema to see its objects. Green = all profiled · yellow = some · red = none.">
           <Mermaid graph={map} label="Coverage map" onPick={(x) => x !== "__ctx__" && pickSchema(x)} />
         </Panel>
-        <Panel title="Schemas" cap="Bar length = share of objects Sense profiled.">
+      </div>
+      {sel ? (
+        <div className="band">
+          <Panel title={short(sel)} cap={sel + " · click an object to open its Sense profile below"}>
+            <Mermaid graph={drill} label={"Objects in " + sel} onPick={(x) => x !== "__s__" && pickObj(x)} />
+          </Panel>
+        </div>) : null}
+      <div className="band grid23">
+        <Panel title="Schemas" cap="Bar length = share of objects Sense profiled. Click to drill in.">
           {bySchema.map(([sch, e]) => (
             <button key={sch} className={"catrow" + (sch === sel ? " on" : "")} onClick={() => pickSchema(sch)} title={sch}>
               <span className="bar" style={{ width: pct(e.ok, e.total) + "%", background: e.ok === e.total ? "#11B981" : e.ok ? "#F59E0B" : "#ef4444" }} />
               <b>{sch}</b><em>{e.ok}/{e.total}</em>
             </button>))}
         </Panel>
+        <Panel title={obj ? short(obj) : "Sense profile"} cap={obj || (sel ? "Click an object in the diagram above." : "Click a schema on the map, then an object.")}
+          right={obj ? (r.profiles[obj] ? <span className="pill ok">PROFILED</span> : <span className="pill bad">NOT PROFILED</span>) : null}>
+          {!obj ? <div className="muted">The profile text appears here exactly as Cortex Sense stores it.</div>
+            : r.profiles[obj] ? <div className="scroll"><Markdown text={r.profiles[obj]} /></div>
+              : <div className="note">Sense holds no profile for this object. It is in scope, but the build did not index it.</div>}
+        </Panel>
       </div>
-      {sel ? (
-        <div className="band grid23">
-          <Panel title={short(sel)} cap={sel + " · click an object to open its Sense profile"}>
-            <Mermaid graph={drill} label={"Objects in " + sel} onPick={(x) => x !== "__s__" && pickObj(x)} />
-          </Panel>
-          <Panel title={obj ? short(obj) : "Sense profile"} cap={obj || "Pick an object on the left."}
-            right={obj ? (r.profiles[obj] ? <span className="pill ok">PROFILED</span> : <span className="pill bad">NOT PROFILED</span>) : null}>
-            {!obj ? <div className="muted">The profile text appears here exactly as Cortex Sense stores it.</div>
-              : r.profiles[obj] ? <div className="scroll"><Markdown text={r.profiles[obj]} /></div>
-                : <div className="note">Sense holds no profile for this object. It is in scope, but the build did not index it.</div>}
-          </Panel>
-        </div>) : null}
       <div className="band">
         <Panel title="All objects" cap={`${rows.length} of ${objects.length} shown`}
           right={<div className="row"><input type="search" placeholder="Filter objects" aria-label="Filter objects" value={s.covFilter || ""} onChange={(e) => setStore({ covFilter: e.target.value })} />
@@ -279,12 +283,13 @@ function Search({ ctx }: { ctx: Ctx }) {
         <div className="row" style={{ justifyContent: "space-between" }}><div className="eyebrow">Search explorer</div><Badge complete={false} /></div>
         <h2>What does Sense know about…</h2>
         <div className="heroSub">Exactly what Cortex Sense returns for a question, as an agent would see it. Documents that no search reaches are not shown.</div>
-        <form className="searchbox" style={{ marginTop: 14 }} onSubmit={(e) => { e.preventDefault(); if (draft.trim()) go(draft.trim()); }}>
+        <div className="searchbox" style={{ marginTop: 14 }}>
           <span className="muted" aria-hidden>⌕</span>
-          <input type="search" aria-label="Search the context" value={draft} onChange={(e) => setStore({ srchDraft: e.target.value })} placeholder="Try: net revenue by subsidiary" />
+          <input type="search" aria-label="Search the context" value={draft} onChange={(e) => setStore({ srchDraft: e.target.value })}
+            onKeyDown={onEnter(() => draft.trim() && go(draft.trim()))} placeholder="Try: net revenue by subsidiary" />
           <select aria-label="Max results" value={max} onChange={(e) => setStore({ srchMax: +e.target.value })}>{[10, 20, 30, 50].map((n) => <option key={n} value={n}>{n} results</option>)}</select>
-          <button className="btn primary" type="submit">Search</button>
-        </form>
+          <button className="btn primary" type="button" onClick={() => draft.trim() && go(draft.trim())}>Search</button>
+        </div>
         <div className="chips" style={{ marginTop: 12 }}>{PRESETS.map((p) => (
           <button key={p} className={"chip" + (p === run ? " on" : "")} onClick={() => go(p)}>{p}</button>))}</div>
       </div>
@@ -325,17 +330,18 @@ function Knowledge({ ctx }: { ctx: Ctx }) {
   for (const [a, rel, b] of edges) if (keep.has(a) && keep.has(b)) g.edge(a, b, rel);
 
   const toggle = (t: string) => setStore({ kgTerms: terms.includes(t) ? terms.filter((x) => x !== t) : [...terms, t] });
+  const addTerm = () => { const v = (s.kgNew || "").trim(); if (v && !terms.includes(v)) setStore({ kgTerms: [...terms, v], kgNew: "" }); };
   const dirty = [...terms].sort().join("|") !== [...applied].sort().join("|");
   return (
     <>
       <Panel title="Knowledge graph" cap="Ontology entities, metrics and relationships that Sense returns for these terms." right={<Badge complete={false} />}>
         <div className="chips">{Array.from(new Set([...PRESETS, ...terms])).map((t) => (
           <button key={t} className={"chip" + (terms.includes(t) ? " on" : "")} aria-pressed={terms.includes(t)} onClick={() => toggle(t)}>{t}</button>))}</div>
-        <form className="row" style={{ marginTop: 10 }} onSubmit={(e) => { e.preventDefault(); const v = (s.kgNew || "").trim(); if (v && !terms.includes(v)) setStore({ kgTerms: [...terms, v], kgNew: "" }); }}>
-          <input type="text" aria-label="Add a term" placeholder="Add a term" value={s.kgNew || ""} onChange={(e) => setStore({ kgNew: e.target.value })} />
-          <button className="btn" type="submit">Add</button>
+        <div className="row" style={{ marginTop: 10 }}>
+          <input type="text" aria-label="Add a term" placeholder="Add a term" value={s.kgNew || ""} onChange={(e) => setStore({ kgNew: e.target.value })} onKeyDown={onEnter(addTerm)} />
+          <button className="btn" type="button" onClick={addTerm}>Add</button>
           <button className="btn primary" type="button" disabled={!dirty || !terms.length} onClick={() => setStore({ kgApplied: terms })}>Search {terms.length} terms</button>
-        </form>
+        </div>
       </Panel>
       {j.loading ? <div className="band"><Gate job={j} title="Collecting ontology documents from Sense" steps={[`Search ${applied.length} terms in parallel`, "Build the graph"]} /></div>
         : j.error ? <Err error={j.error} retry={() => resetJob(k)} /> : (
@@ -346,8 +352,8 @@ function Knowledge({ ctx }: { ctx: Ctx }) {
               <Tile label="Nodes in scope domains" value={r.expected || "-"} sub="node_count in scope.yaml" />
               <Tile label="Terms searched" value={applied.length} sub={r.failed ? `${r.failed} failed` : "all answered"} />
             </div>
-            <div className="band grid32">
-              <Panel title={focus ? "Around " + focus : "Whole graph"} cap="Click a node to open its Sense document and center the graph on it."
+            <div className="band">
+              <Panel title={focus ? "Around " + focus : "Whole graph"} cap="Click a node to open its Sense document below and center the graph on it."
                 right={<div className="row">
                   <select aria-label="Focus on" value={focus || ""} onChange={(e) => setFocus(e.target.value || null)}>
                     <option value="">Whole graph</option>{names.map((n) => <option key={n} value={n}>{n}</option>)}</select>
@@ -356,16 +362,18 @@ function Knowledge({ ctx }: { ctx: Ctx }) {
                 <div className="legend" style={{ marginBottom: 8 }}><span><i style={{ background: "#DDEBF7" }} />Entity</span><span><i style={{ background: "#FFF2CC" }} />Concept or metric</span><span><i style={{ background: "#EEEEEE" }} />Seen only in a relationship</span></div>
                 {g.size ? <Mermaid graph={g} label="Knowledge graph" onPick={setFocus} /> : <div className="info">Sense returned no ontology documents for these terms.</div>}
               </Panel>
-              <Panel title={focus || "Node details"} cap={focus ? (nodes[focus]?.kind || "relationship only") : "Pick a node on the graph."}>
+            </div>
+            <div className="band grid32">
+              <Panel title={focus || "Node details"} cap={focus ? (nodes[focus]?.kind || "relationship only") : "Click a node on the graph above."}>
                 {!focus ? <div className="muted">The node's document appears here exactly as Cortex Sense stores it.</div>
                   : nodes[focus] ? <div className="scroll"><Markdown text={nodes[focus].text} /></div>
                     : <div className="note">Sense returned relationships for this node but not its own document. Add it as a term to fetch it.</div>}
-                {focus ? (
-                  <div className="band"><h3 style={{ fontSize: 15 }}>Relationships</h3>
-                    {edges.filter(([a, , b]) => a === focus || b === focus).map(([a, rel, b], i) => (
-                      <div key={i} className="row" style={{ marginTop: 4 }}>
-                        <button className="chip" onClick={() => setFocus(a)}>{a}</button><span className="muted">{rel} →</span><button className="chip" onClick={() => setFocus(b)}>{b}</button></div>))}
-                  </div>) : null}
+              </Panel>
+              <Panel title="Relationships" cap={focus ? "Click a name to move the focus." : "Pick a node to see its relationships."}>
+                {focus ? edges.filter(([a, , b]) => a === focus || b === focus).map(([a, rel, b], i) => (
+                  <div key={i} className="row" style={{ marginTop: 4 }}>
+                    <button className="chip" onClick={() => setFocus(a)}>{a}</button><span className="muted">{rel} →</span><button className="chip" onClick={() => setFocus(b)}>{b}</button></div>))
+                  : null}
               </Panel>
             </div>
           </>)}
@@ -397,10 +405,12 @@ function LineageGraph({ target, direction, distance }: { target: string; directi
       <Tile label="Downstream links" value={down} sub="what uses it" dot="#11B981" />
       <Tile label="Deepest hop" value={Math.max(...edges.map((e) => e[2]))} />
     </div>
-    <div className="band grid32">
+    <div className="band">
       <Panel title="Lineage graph" cap="Click an object to center the lineage on it.">
         <Mermaid graph={g} label={"Lineage of " + target} onPick={(x) => setStore({ linTarget: x, linDraft: x })} />
       </Panel>
+    </div>
+    <div className="band">
       <Panel title="Edges" cap={`${edges.length} edges`}>
         <div className="tframe"><table className="t"><thead><tr><th>Source</th><th>Target</th><th>Dir</th><th>Hop</th></tr></thead><tbody>
           {edges.map(([a, b, d, dir], i) => <tr key={i}><td className="mono" title={a}>{mid(a)}</td><td className="mono" title={b}>{mid(b)}</td>
@@ -414,15 +424,17 @@ function LineageGraph({ target, direction, distance }: { target: string; directi
 function Lineage() {
   const s = useStore();
   const valid = /^[^.\s]+\.[^.\s]+\.[^.\s]+$/.test((s.linDraft || "").trim());
+  // Plain buttons, not a form element: Snowsight's sandboxed frame does not deliver form submits.
+  const show = () => { if (valid) setStore({ linTarget: s.linDraft.trim() }); };
   return (
     <>
       <Panel title="Lineage" cap="Where a table's data comes from, and what uses it. Source: Snowflake lineage (SNOWFLAKE.CORE.GET_LINEAGE), not Sense.">
-        <form className="row" onSubmit={(e) => { e.preventDefault(); if (valid) setStore({ linTarget: s.linDraft.trim() }); }}>
-          <input className="grow" type="text" aria-label="Object" placeholder="DB.SCHEMA.TABLE" value={s.linDraft || ""} onChange={(e) => setStore({ linDraft: e.target.value })} />
+        <div className="row">
+          <input className="grow" type="text" aria-label="Object" placeholder="DB.SCHEMA.TABLE" value={s.linDraft || ""} onChange={(e) => setStore({ linDraft: e.target.value })} onKeyDown={onEnter(show)} />
           <div className="seg">{["UPSTREAM", "DOWNSTREAM", "BOTH"].map((d) => <button type="button" key={d} className={(s.linDir || "UPSTREAM") === d ? "on" : ""} onClick={() => setStore({ linDir: d })}>{d.toLowerCase()}</button>)}</div>
           <select aria-label="Distance" value={s.linDist || 3} onChange={(e) => setStore({ linDist: +e.target.value })}>{[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n} hop{n > 1 ? "s" : ""}</option>)}</select>
-          <button className="btn primary" type="submit" disabled={!valid}>Show lineage</button>
-        </form>
+          <button className="btn primary" type="button" disabled={!valid} onClick={show}>Show lineage</button>
+        </div>
       </Panel>
       {s.linTarget ? <LineageGraph target={s.linTarget} direction={s.linDir || "UPSTREAM"} distance={s.linDist || 3} /> : null}
     </>
