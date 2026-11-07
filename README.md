@@ -57,6 +57,18 @@ and runs it with the user's own role. Direct actions in the app need restricted 
 rights, and Cortex Sense builder actions do not run under it yet: the session drops the
 `SNOWFLAKE.CORTEX_SENSE_BUILDER` role.
 
+## Install with Cortex Code
+
+Clone this repository, start Cortex Code in the folder, and paste:
+
+```text
+Read INSTALL.md in this repository and install Cortex Sense Studio in my Snowflake account.
+Ask me for the names you need. Stop and ask before you create anything or run a GRANT.
+```
+
+The agent follows [INSTALL.md](INSTALL.md): it checks your tools and Cortex Sense access,
+shows you the SQL, waits for your approval, deploys, and verifies. To install by hand, use "Deploy" below.
+
 ## Requirements
 
 - A Snowflake account with Cortex Sense enabled, and at least one context you can use.
