@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+uv.lock
+
+# Node
+frontend/node_modules/
+
+# Local Streamlit config and credentials: never commit
+.streamlit/secrets.toml
+.env
+.env.*
+*.p8
+*.pem
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,24 @@
+{
+  "name": "cortex-sense-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/",
+    "smoke": "node smoke.mjs"
+  },
+  "dependencies": {
+    "@mermaid-js/tiny": "12.3.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.31",
+    "@types/react-dom": "18.3.7",
+    "esbuild": "0.28.2",
+    "jsdom": "30.1.3",
+    "playwright-core": "1.64.0",
+    "typescript": "^5.6.3"
+  }
+}
